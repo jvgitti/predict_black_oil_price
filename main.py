@@ -99,7 +99,7 @@ with tab_0:
     df.plot(ax=ax, legend=False)
     ma.plot(ax=ax, legend = False, color = 'r')
     plt.xlabel('Ano')
-    plt.ylabel('Valor (R$) (em milhares)')
+    plt.ylabel('Valor (US$)')
 
     plt.tight_layout()
     st.pyplot(plt)
@@ -185,7 +185,7 @@ with tab_1:
     fig.update_layout(
         title='Ibovespa - Predição do valor de fechamento',
         xaxis_title='Ano',
-        yaxis_title='Valor (R$) (em milhares)',
+        yaxis_title='Valor (US$)',
         legend=dict(
             x=0,
             y=-0.2,
