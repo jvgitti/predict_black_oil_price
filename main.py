@@ -183,7 +183,7 @@ with tab_1:
     fig.update_traces(line=dict(color='aquamarine'), selector=dict(name='Intervalo de confiança'))
 
     fig.update_layout(
-        title='Ibovespa - Predição do valor de fechamento',
+        title='Preço do Petróleo Bruto - Predição do valor',
         xaxis_title='Ano',
         yaxis_title='Valor (US$)',
         legend=dict(
