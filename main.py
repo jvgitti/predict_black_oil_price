@@ -5,10 +5,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import plotly.express as px
 import seaborn as sns
-import numpy as np
-import joblib
+import requests as r
+from datetime import datetime
 
 import streamlit as st
+
+API_URL = 'https://api-predict-black-oil-price.onrender.com'
 
 st.title('Análise para predição dos valores do barril de petróleo')
 
@@ -22,6 +24,10 @@ df = df.set_index('ds')
 
 ad_fuller = adfuller(df.y.values)
 p_value = ad_fuller[1]
+
+last_trained_date_response = r.get(API_URL + '/last_trained_date')
+last_trained_date = last_trained_date_response.json()
+last_trained_date = datetime.strptime(last_trained_date, '%Y-%m-%d').date()
 
 
 with tab_0:
@@ -129,76 +135,46 @@ with tab_0:
     0, de modo que podemos rejeitar a hipótese nula, e considerar que a série agora é estacionária.
     """
 
-
-def calcula_wmape(y_true, y_pred):
-    return np.abs(y_true - y_pred).sum() / np.abs(y_true).sum()
-
-
-df = df.reset_index('ds')
-df['unique_id'] = 0
-df_treino = df[df.ds < '2022-12-22']
-df_valid = df[df.ds >= '2022-12-22']
-
-# from statsforecast import StatsForecast
-# from statsforecast.models import Naive, MSTL
-#
-# model = StatsForecast(models=[MSTL(season_length=[247, 22, 5], trend_forecaster=Naive())], freq='B', n_jobs=-1)
-# model.fit(df_treino)
-# joblib.dump(model, 'model.joblib')
-
 with tab_1:
-    """
-    Avaliamos e testamos diversos modelos para a predição dos valores de fechamento, e o que apresentou o melhor resultado foi o modelo Naive,
-    juntamente com o MSTL, pois conseguimos passar diversas sazonalidades para o modelo em questão.
-    
-    Estudando as variáveis que podem interferir no nosso modelo, optamos por treinar o modelo com uma sazonalidade anual, mensal e semanal.
-    Como período, utilizamos o período diário, considerando apenas os dias úteis, em que a bolsa està aberta.
-    
-    Utilizamos todo o período de dados para treinar o modelo (de 2003 à 2023).
-    
-    Abaixo segue o resultado do modelo, com os dados reais de 2019 até os dias atuais, e a predição realizada a partir de Agosto/2022.
-    
-    Com a barra, pode-se escolher o período de predição desejado, com o máximo de 260 dias úteis, aproximadamente 1 ano no total.
-    """
-
-    h = st.slider("Selecione um valor entre 50 e 260, para a predição:", 50, 260, value=260)
-    model = joblib.load('model.joblib')
-    forecast_df = model.predict(h=h, level=[90])
-    forecast_df = forecast_df.reset_index().merge(df_valid, on=['ds', 'unique_id'], how='left')
-    forecast_df = forecast_df.dropna()
-
-    wmape = calcula_wmape(forecast_df['y'].values, forecast_df['MSTL'].values)
-
-    import plotly.express as px
-    import plotly.graph_objects as go
-
-    fig = px.line(df_treino[df_treino.ds >= '2019-05-01'], x='ds', y='y', line_shape='linear')
-    fig.add_scatter(x=forecast_df['ds'], y=forecast_df['y'], mode='lines', name='Real')
-    fig.add_scatter(x=forecast_df['ds'], y=forecast_df['MSTL'], mode='lines', name='Predito')
-    fig.add_scatter(x=forecast_df['ds'], y=forecast_df['MSTL-lo-90'], mode='lines', name='Intervalo de confiança')
-    fig.add_scatter(x=forecast_df['ds'], y=forecast_df['MSTL-hi-90'], mode='lines', name='Intervalo de confiança', showlegend=False)
-
-    fig.update_traces(line=dict(color='blue'), selector=dict(name='Real'))
-    fig.update_traces(line=dict(color='green'), selector=dict(name='Predito'))
-    fig.update_traces(line=dict(color='aquamarine'), selector=dict(name='Intervalo de confiança'))
-
-    fig.update_layout(
-        title='Preço do Petróleo Bruto - Predição do valor',
-        xaxis_title='Ano',
-        yaxis_title='Valor (US$)',
-        legend=dict(
-            x=0,
-            y=-0.2,
-            orientation="h",
-        )
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
     f"""
-    WMAPE para o período fornecido: {wmape:.2%}
+    Última data observada: {last_trained_date.strftime('%d/%m/%Y')}
     """
 
-    f"""
-    Variando-se o período de predição, percebe-se que o modelo varia o valor do WMAPE, apresentando um resultado interessante no longo prazo.
-    """
+    if st.button('Atualizar dados e modelo'):
+        response = r.post(API_URL + '/update_data_and_model')
+        if response.status_code == 200:
+            st.success(response.json()['status'])
 
+    date_to_predict = st.date_input("Selecione a data para previsão:", value=last_trained_date)
+
+    if last_trained_date > date_to_predict:
+        st.warning('Escolha uma data maior que a última data observada', icon="⚠️")
+    elif last_trained_date < date_to_predict:
+        predict_response = r.post(API_URL + '/predict', json=dict(date=str(date_to_predict)))
+        if predict_response.status_code != 200:
+            st.error('Erro ao realizar predição', icon="!️")
+        else:
+            df_predict = pd.DataFrame(predict_response.json())
+
+            last_day_predicted = df_predict['date'].max()
+            value_last_day_predict = df_predict[df_predict.date == last_day_predicted]['value'].iloc[0]
+
+            last_day_predicted = datetime.strptime(last_day_predicted, '%Y-%m-%d').strftime('%d/%m/%Y')
+
+            f"""
+                        Valor predito para o dia {last_day_predicted}: US$ {value_last_day_predict}
+            """
+
+            fig = px.line(df_predict, x='date', y='value', line_shape='linear')
+
+            fig.update_layout(
+                title='Preço do Petróleo Bruto - Predição do valor',
+                xaxis_title='Dia',
+                yaxis_title='Valor (US$)',
+                legend=dict(
+                    x=0,
+                    y=-0.2,
+                    orientation="h",
+                )
+            )
+            st.plotly_chart(fig, use_container_width=True)
