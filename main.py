@@ -162,7 +162,7 @@ with tab_1:
             last_day_predicted = datetime.strptime(last_day_predicted, '%Y-%m-%d').strftime('%d/%m/%Y')
 
             f"""
-                        Valor predito para o dia {last_day_predicted}: US$ {value_last_day_predict}
+                        Valor predito para o dia {last_day_predicted}: US$ {value_last_day_predict:.2f}
             """
 
             fig = px.line(df_predict, x='date', y='value', line_shape='linear')
