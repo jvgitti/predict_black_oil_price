@@ -169,7 +169,7 @@ with tab_1:
 
             fig.update_layout(
                 title='Preço do Petróleo Bruto - Predição do valor',
-                xaxis_title='Dia',
+                xaxis_title='Data',
                 yaxis_title='Valor (US$)',
                 legend=dict(
                     x=0,
